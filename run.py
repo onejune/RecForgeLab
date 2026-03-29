@@ -8,6 +8,9 @@ RecForgeLab 统一入口
     # 单模型实验
     python run.py --model deepfm --dataset criteo
 
+    # Multi-Domain 模型
+    python run.py --model star --dataset ali_ccp_multi_domain
+
     # 指定配置文件
     python run.py --config config/experiment/compare_models.yaml
 
@@ -16,12 +19,18 @@ RecForgeLab 统一入口
 
     # 多模型对比
     python run.py --config config/experiment/compare_models.yaml --mode compare
+    
+    # Multi-Domain 模型对比
+    python run.py --config config/experiment/compare_multi_domain.yaml --mode compare
 
     # SSL 两阶段训练
     python run.py --config config/experiment/ssl_cvr.yaml --mode ssl
 
     # 命令行覆盖配置
     python run.py --model deepfm --dataset criteo --learning_rate 0.0001 --epochs 5
+    
+    # 列出所有模型
+    python run.py --list_models
 """
 
 import os
@@ -36,8 +45,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from recforgelab.utils.config import Config
 from recforgelab.utils.logger import get_logger, set_color
 from recforgelab.data import create_dataset, create_dataloader
-from recforgelab.model import MODEL_REGISTRY, get_model
+from recforgelab.model import MODEL_REGISTRY, get_model, MultiDomainModel
 from recforgelab.trainer.trainer import Trainer
+from recforgelab.evaluator import Evaluator
 
 
 # ============================================================
@@ -76,6 +86,13 @@ def run_single(config: Config) -> Dict[str, float]:
     model = model_class(config, train_dataset)
     model = model.to(config["device"])
     model._print_param_count()
+    
+    # 检测是否为 Multi-Domain 模型
+    is_multi_domain = isinstance(model, MultiDomainModel)
+    if is_multi_domain:
+        logger.info(set_color("  [Multi-Domain Model Detected]", "yellow"))
+        logger.info(f"  num_domains: {model.num_domains}")
+        logger.info(f"  domain_field: {model.domain_field}")
 
     # 训练
     logger.info(set_color("\n[3/4] Training...", "cyan"))
@@ -87,13 +104,94 @@ def run_single(config: Config) -> Dict[str, float]:
 
     # 测试
     logger.info(set_color("\n[4/4] Testing...", "cyan"))
-    test_results = trainer._evaluate_epoch(test_loader, epoch=-1)
+    
+    # Multi-Domain 模型需要分域评估
+    if is_multi_domain:
+        test_results = evaluate_multi_domain(model, test_loader, config)
+    else:
+        test_results = trainer._evaluate_epoch(test_loader, epoch=-1)
 
     logger.info(set_color("\n[Results]", "green"))
     for k, v in test_results.items():
-        logger.info(f"  {k:<20} = {v:.6f}")
+        if isinstance(v, dict):
+            logger.info(f"  {k}:")
+            for kk, vv in v.items():
+                logger.info(f"    {kk:<18} = {vv:.6f}")
+        else:
+            logger.info(f"  {k:<20} = {v:.6f}")
 
     return test_results
+
+
+def evaluate_multi_domain(model, dataloader, config) -> Dict[str, Any]:
+    """Multi-Domain 模型分域评估
+    
+    Args:
+        model: Multi-Domain 模型
+        dataloader: 测试数据加载器
+        config: 配置
+    
+    Returns:
+        包含整体指标和分域指标的字典
+    """
+    import numpy as np
+    from sklearn.metrics import roc_auc_score, log_loss
+    
+    logger = get_logger()
+    model.eval()
+    
+    all_preds = []
+    all_labels = []
+    all_domains = []
+    
+    device = config["device"]
+    
+    with torch.no_grad():
+        for batch in dataloader:
+            batch = {k: v.to(device) if hasattr(v, 'to') else v for k, v in batch.items()}
+            preds = model.predict(batch)
+            
+            all_preds.append(preds.cpu().numpy())
+            all_labels.append(batch[config.get("label_field", "label")].cpu().numpy())
+            all_domains.append(batch[config.get("domain_field", "domain_indicator")].cpu().numpy())
+    
+    all_preds = np.concatenate(all_preds)
+    all_labels = np.concatenate(all_labels)
+    all_domains = np.concatenate(all_domains)
+    
+    # 整体指标
+    overall_auc = roc_auc_score(all_labels, all_preds)
+    overall_logloss = log_loss(all_labels, all_preds)
+    
+    # 分域指标
+    num_domains = model.num_domains
+    domain_metrics = {}
+    
+    for d in range(num_domains):
+        mask = (all_domains == d)
+        if mask.sum() > 0:
+            d_preds = all_preds[mask]
+            d_labels = all_labels[mask]
+            d_auc = roc_auc_score(d_labels, d_preds)
+            d_logloss = log_loss(d_labels, d_preds)
+            d_size = mask.sum()
+            domain_metrics[f"domain_{d}"] = {
+                "auc": d_auc,
+                "logloss": d_logloss,
+                "samples": d_size,
+                "ratio": d_size / len(all_labels),
+            }
+            logger.info(f"  Domain_{d}: AUC={d_auc:.4f}, LogLoss={d_logloss:.4f}, "
+                       f"samples={d_size} ({d_size/len(all_labels)*100:.1f}%)")
+    
+    return {
+        "AUC": overall_auc,
+        "LogLoss": overall_logloss,
+        "domains": domain_metrics,
+    }
+
+
+import torch
 
 
 # ============================================================
@@ -257,7 +355,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    parser.add_argument("--model", type=str, default=None, help="Model name (e.g., deepfm, dcn)")
+    parser.add_argument("--model", type=str, default=None, help="Model name (e.g., deepfm, star, m3oe)")
     parser.add_argument("--dataset", type=str, default=None, help="Dataset name")
     parser.add_argument("--config", type=str, default=None, help="Config file path")
     parser.add_argument(
@@ -276,9 +374,50 @@ def main():
         # 导入所有模型触发注册
         from recforgelab.model import MODEL_REGISTRY
         print("Registered models:")
+        print("-" * 60)
+        
+        # 按类型分组
+        ctr_models = []
+        multitask_models = []
+        multi_domain_models = []
+        ssl_models = []
+        
         for name in sorted(MODEL_REGISTRY.keys()):
             cls = MODEL_REGISTRY[name]
-            print(f"  {name:<20} -> {cls.__module__}.{cls.__name__}")
+            model_type = getattr(cls, 'model_type', None)
+            type_name = model_type.value if model_type else 'unknown'
+            
+            if type_name == 'ctr':
+                ctr_models.append((name, cls))
+            elif type_name == 'multitask':
+                multitask_models.append((name, cls))
+            elif type_name == 'multi_domain':
+                multi_domain_models.append((name, cls))
+            elif type_name == 'ssl':
+                ssl_models.append((name, cls))
+        
+        if ctr_models:
+            print("\n[CTR Models]")
+            for name, cls in ctr_models:
+                print(f"  {name:<20} -> {cls.__name__}")
+        
+        if multitask_models:
+            print("\n[Multitask Models]")
+            for name, cls in multitask_models:
+                print(f"  {name:<20} -> {cls.__name__}")
+        
+        if multi_domain_models:
+            print("\n[Multi-Domain Models]")
+            for name, cls in multi_domain_models:
+                print(f"  {name:<20} -> {cls.__name__}")
+        
+        if ssl_models:
+            print("\n[SSL Models]")
+            for name, cls in ssl_models:
+                print(f"  {name:<20} -> {cls.__name__}")
+        
+        print("-" * 60)
+        print(f"Total: {len(MODEL_REGISTRY)} models")
         return
 
     # 构建配置
