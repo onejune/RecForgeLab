@@ -1,0 +1,37 @@
+# Multi-Domain 数据集配置示例
+# 以 Ali-CCP 为例，按 task_type 划分域
+
+dataset: ali_ccp_multi_domain
+data_path: /mnt/data/oss_wanjun/pai_work/open_research/dataset/ali_ccp/
+data_format: parquet
+
+# 标签
+label_field: click
+
+# 域标识字段
+domain_field: task_type
+num_domains: 3  # Ali-CCP 有 3 个 task_type
+
+# 特征
+sparse_features:
+  - user_id
+  - item_id
+  - category_id
+  - brand_id
+  # ... 更多稀疏特征
+
+dense_features:
+  - price
+  # ... 更多稠密特征
+
+# 域划分说明
+# domain_0: task_type=0
+# domain_1: task_type=1  
+# domain_2: task_type=2
+
+# 编码器
+encoder_type: minmax
+
+# 训练/测试划分
+train_ratio: 0.8
+valid_ratio: 0.1

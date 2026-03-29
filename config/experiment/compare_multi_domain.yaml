@@ -1,0 +1,67 @@
+# Multi-Domain 模型对比实验配置
+# 对比 STAR, M2M, EPNet, PPNet, HAMUR, M3oE
+
+dataset: ali_ccp_multi_domain
+data_path: /mnt/data/oss_wanjun/pai_work/open_research/dataset/ali_ccp/
+
+# 域配置
+domain_field: task_type
+num_domains: 3
+
+# 通用参数
+embedding_size: 16
+mlp_hidden_size: [256, 128, 64]
+dropout_prob: 0.2
+learning_rate: 0.001
+train_batch_size: 4096
+eval_batch_size: 8192
+epochs: 10
+early_stop_patience: 3
+
+# 评估指标
+metrics: [AUC, LogLoss, GAUC, PCOC]
+valid_metric: AUC
+
+# 对比实验
+experiments:
+  - name: shared_bottom_baseline
+    config:
+      model: shared_bottom
+      num_domains: 3
+      
+  - name: star
+    config:
+      model: star
+      mlp_hidden_size: [256, 128, 64]
+      aux_dims: [64, 32]
+      
+  - name: m2m
+    config:
+      model: m2m
+      num_experts: 4
+      expert_output_size: 16
+      transformer_layers: 2
+      transformer_heads: 4
+      
+  - name: epnet
+    config:
+      model: epnet
+      mlp_hidden_size: [256, 128, 64]
+      
+  - name: ppnet
+    config:
+      model: ppnet
+      mlp_hidden_size: [256, 128, 64]
+      
+  - name: hamur
+    config:
+      model: hamur
+      mlp_hidden_size: [256, 256, 128, 128, 64]
+      adapter_rank: 8
+      
+  - name: m3oe
+    config:
+      model: m3oe
+      num_experts: 4
+      expert_hidden_size: [256, 128]
+      tower_hidden_size: [64, 32]

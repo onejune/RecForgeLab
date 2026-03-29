@@ -12,6 +12,7 @@ class ModelType(Enum):
     CTR = "ctr"               # CTR 单任务
     CVR = "cvr"               # CVR 单任务
     MULTITASK = "multitask"   # 多任务（CTR+CVR）
+    MULTIDOMAIN = "multi_domain"  # 多域/多场景
     SEQUENTIAL = "sequential" # 序列模型
     SSL = "ssl"               # 自监督学习
 

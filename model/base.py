@@ -262,3 +262,52 @@ class SSLModel(BaseModel):
             return self.downstream_loss(batch)
         else:  # joint
             return self.ssl_weight * self.ssl_loss(batch) + self.downstream_loss(batch)
+
+
+# ============================================================
+# Multi-Domain 基类
+# ============================================================
+
+class MultiDomainModel(BaseModel):
+    """多域/多场景模型基类
+    
+    model_type = ModelType.MULTIDOMAIN
+    核心特点：
+    - 输入包含 domain_indicator 字段，标识样本所属域
+    - predict() 返回 [B] 概率 tensor
+    - 支持分域评估（各域单独计算指标）
+    """
+
+    model_type = ModelType.MULTIDOMAIN
+
+    def __init__(self, config, dataset):
+        super().__init__(config, dataset)
+        
+        # 域配置
+        self.domain_field: str = config.get("domain_field", "domain_indicator")
+        self.num_domains: int = config.get("num_domains", 1)
+        
+        # 域特征（用于 domain embedding，可选）
+        self.domain_features: List[str] = config.get("domain_features", [])
+        
+        # 从 dataset 获取域数量（如果未配置）
+        if hasattr(dataset, "num_domains"):
+            self.num_domains = max(self.num_domains, dataset.num_domains)
+
+    def get_domain_id(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
+        """获取域标识 tensor [B]"""
+        domain_id = batch.get(self.domain_field)
+        if domain_id is None:
+            raise KeyError(
+                f"'{self.domain_field}' not found in batch. "
+                f"Multi-domain models require a domain indicator field."
+            )
+        return domain_id.long()
+
+    def extra_metrics(
+        self,
+        batch: Dict[str, torch.Tensor],
+        outputs: Any,
+    ) -> Dict[str, float]:
+        """默认返回域数量"""
+        return {"num_domains": float(self.num_domains)}
