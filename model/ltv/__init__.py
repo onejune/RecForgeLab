@@ -17,13 +17,26 @@ from .two_stage import TwoStageLTV
 from .tweedie import TweedieLTV
 from .ordinal import OrdinalLTV
 from .mdn import MDNLTV
+from .direct_regression import (
+    DirectRegressionLTV, MSELTV, MAELTV, HuberLTV,
+    LogCoshLTV, QuantileLTV, LogMSELTV,
+)
 
 __all__ = [
     "LTVModel",
     "register_ltv_model",
+    # 概率模型
     "ZILN",
     "TwoStageLTV",
     "TweedieLTV",
     "OrdinalLTV",
     "MDNLTV",
+    # 直接回归
+    "DirectRegressionLTV",
+    "MSELTV",
+    "MAELTV",
+    "HuberLTV",
+    "LogCoshLTV",
+    "QuantileLTV",
+    "LogMSELTV",
 ]

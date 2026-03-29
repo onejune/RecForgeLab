@@ -376,6 +376,176 @@ class SimpleMDN(SimpleLTVBase):
 
 
 # ============================================================
+# 直接回归模型（新增）
+# ============================================================
+
+class SimpleMSE(SimpleLTVBase):
+    """MSE 直接回归"""
+    
+    def __init__(self, n_features=20, hidden_sizes=[128, 64]):
+        super().__init__(n_features, hidden_sizes)
+        h = hidden_sizes[-1]
+        self.output_layer = torch.nn.Sequential(
+            torch.nn.Linear(h, 1),
+            torch.nn.Softplus(),
+        )
+    
+    def forward(self, batch):
+        h = self.mlp(batch['features'])
+        return self.output_layer(h).squeeze(-1)
+    
+    def calculate_loss(self, batch):
+        pred = self.forward(batch)
+        labels = batch['ltv']
+        return torch.nn.functional.mse_loss(pred, labels)
+    
+    def predict(self, batch):
+        return self.forward(batch)
+
+
+class SimpleMAE(SimpleLTVBase):
+    """MAE 直接回归"""
+    
+    def __init__(self, n_features=20, hidden_sizes=[128, 64]):
+        super().__init__(n_features, hidden_sizes)
+        h = hidden_sizes[-1]
+        self.output_layer = torch.nn.Sequential(
+            torch.nn.Linear(h, 1),
+            torch.nn.Softplus(),
+        )
+    
+    def forward(self, batch):
+        h = self.mlp(batch['features'])
+        return self.output_layer(h).squeeze(-1)
+    
+    def calculate_loss(self, batch):
+        pred = self.forward(batch)
+        labels = batch['ltv']
+        return torch.nn.functional.l1_loss(pred, labels)
+    
+    def predict(self, batch):
+        return self.forward(batch)
+
+
+class SimpleHuber(SimpleLTVBase):
+    """Huber 直接回归"""
+    
+    def __init__(self, n_features=20, hidden_sizes=[128, 64], delta=10.0):
+        super().__init__(n_features, hidden_sizes)
+        h = hidden_sizes[-1]
+        self.output_layer = torch.nn.Sequential(
+            torch.nn.Linear(h, 1),
+            torch.nn.Softplus(),
+        )
+        self.delta = delta
+    
+    def forward(self, batch):
+        h = self.mlp(batch['features'])
+        return self.output_layer(h).squeeze(-1)
+    
+    def calculate_loss(self, batch):
+        pred = self.forward(batch)
+        labels = batch['ltv']
+        
+        diff = torch.abs(pred - labels)
+        quadratic = torch.min(diff, torch.tensor(self.delta, device=diff.device))
+        linear = diff - quadratic
+        
+        return torch.mean(0.5 * quadratic ** 2 + self.delta * linear)
+    
+    def predict(self, batch):
+        return self.forward(batch)
+
+
+class SimpleLogMSE(SimpleLTVBase):
+    """Log-MSE 直接回归（预测 log(LTV+1)）"""
+    
+    def __init__(self, n_features=20, hidden_sizes=[128, 64]):
+        super().__init__(n_features, hidden_sizes)
+        h = hidden_sizes[-1]
+        # 输出 log(LTV + 1)，不需要激活
+        self.output_layer = torch.nn.Linear(h, 1)
+    
+    def forward(self, batch):
+        h = self.mlp(batch['features'])
+        return self.output_layer(h).squeeze(-1)
+    
+    def calculate_loss(self, batch):
+        pred = self.forward(batch)
+        labels = batch['ltv']
+        log_target = torch.log(labels + 1)
+        return torch.nn.functional.mse_loss(pred, log_target)
+    
+    def predict(self, batch):
+        pred = self.forward(batch)
+        return torch.exp(pred) - 1
+
+
+class SimpleWeightedMSE(SimpleLTVBase):
+    """加权 MSE（非零样本权重更高）"""
+    
+    def __init__(self, n_features=20, hidden_sizes=[128, 64], 
+                 zero_weight=0.1, nonzero_weight=1.0):
+        super().__init__(n_features, hidden_sizes)
+        h = hidden_sizes[-1]
+        self.output_layer = torch.nn.Sequential(
+            torch.nn.Linear(h, 1),
+            torch.nn.Softplus(),
+        )
+        self.zero_weight = zero_weight
+        self.nonzero_weight = nonzero_weight
+    
+    def forward(self, batch):
+        h = self.mlp(batch['features'])
+        return self.output_layer(h).squeeze(-1)
+    
+    def calculate_loss(self, batch):
+        pred = self.forward(batch)
+        labels = batch['ltv']
+        
+        weights = torch.where(labels > 0,
+                              torch.tensor(self.nonzero_weight, device=labels.device),
+                              torch.tensor(self.zero_weight, device=labels.device))
+        
+        return torch.mean(weights * (pred - labels) ** 2)
+    
+    def predict(self, batch):
+        return self.forward(batch)
+
+
+class SimpleQuantile(SimpleLTVBase):
+    """分位数回归"""
+    
+    def __init__(self, n_features=20, hidden_sizes=[128, 64], 
+                 quantiles=[0.1, 0.5, 0.9]):
+        super().__init__(n_features, hidden_sizes)
+        self.quantiles = quantiles
+        h = hidden_sizes[-1]
+        self.output_layer = torch.nn.Linear(h, len(quantiles))
+    
+    def forward(self, batch):
+        h = self.mlp(batch['features'])
+        return self.output_layer(h)  # (batch, num_quantiles)
+    
+    def calculate_loss(self, batch):
+        pred = self.forward(batch)
+        labels = batch['ltv']
+        
+        losses = []
+        for i, q in enumerate(self.quantiles):
+            error = labels - pred[:, i]
+            losses.append(torch.max(q * error, (1 - q) * -error))
+        
+        return torch.mean(torch.stack(losses))
+    
+    def predict(self, batch):
+        pred = self.forward(batch)
+        # 返回中位数
+        median_idx = len(self.quantiles) // 2
+        return pred[:, median_idx]
+
+
+# ============================================================
 # 评估函数
 # ============================================================
 
@@ -505,11 +675,19 @@ def main():
     
     # 模型列表
     models = {
+        # 概率模型
         'ziln': SimpleZILN,
         'two_stage': SimpleTwoStage,
         'tweedie': SimpleTweedie,
         'ordinal': SimpleOrdinal,
         'mdn': SimpleMDN,
+        # 直接回归
+        'mse': SimpleMSE,
+        'mae': SimpleMAE,
+        'huber': SimpleHuber,
+        'log_mse': SimpleLogMSE,
+        'weighted_mse': SimpleWeightedMSE,
+        'quantile': SimpleQuantile,
     }
     
     if args.model:

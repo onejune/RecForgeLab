@@ -12,7 +12,10 @@ from .base import (
 from .ctr import DeepFM, DCN, DCNv2, AutoInt, xDeepFM
 from .multitask import ESMM, MMoE, PLE, SharedBottom, DirectCTCVR
 from .multi_domain import STAR, M2M, EPNet, PPNet, HAMUR, M3oE
-from .ltv import ZILN, TwoStageLTV, TweedieLTV, OrdinalLTV, MDNLTV
+from .ltv import (
+    ZILN, TwoStageLTV, TweedieLTV, OrdinalLTV, MDNLTV,
+    DirectRegressionLTV, MSELTV, MAELTV, HuberLTV, LogCoshLTV, QuantileLTV, LogMSELTV,
+)
 
 __all__ = [
     # 基类
@@ -45,10 +48,18 @@ __all__ = [
     "PPNet",
     "HAMUR",
     "M3oE",
-    # LTV 模型
+    # LTV 模型 - 概率模型
     "ZILN",
     "TwoStageLTV",
     "TweedieLTV",
     "OrdinalLTV",
     "MDNLTV",
+    # LTV 模型 - 直接回归
+    "DirectRegressionLTV",
+    "MSELTV",
+    "MAELTV",
+    "HuberLTV",
+    "LogCoshLTV",
+    "QuantileLTV",
+    "LogMSELTV",
 ]
