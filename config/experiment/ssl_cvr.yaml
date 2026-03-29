@@ -1,0 +1,62 @@
+# SSL CVR 实验配置
+# 用法: python run.py --config config/experiment/ssl_cvr.yaml --mode ssl
+#
+# 自监督学习增强 CVR 预估
+# 两阶段训练：
+#   Phase 1: 对比学习预训练（全量曝光数据）
+#   Phase 2: CVR 微调（点击数据）
+
+dataset: ivr_v16
+data_path: ./data/ivr_v16
+data_format: spark_dir
+
+# 模型
+model: esmm  # 或自定义 SSL 模型
+embedding_size: 32
+mlp_hidden_size: [512, 256, 128]
+dropout_prob: 0.1
+encoder_type: autodis
+encoder_config:
+  num_intervals: 16
+
+# 多任务配置
+tasks: [ctr, cvr, ctcvr]
+task_weights: [1.0, 0.5, 1.0]
+
+# SSL 配置
+ssl_weight: 0.1
+temperature: 0.1
+pretrain_epochs: 5
+finetune_epochs: 10
+
+# 训练配置
+learning_rate: 0.001
+train_batch_size: 2048
+eval_batch_size: 4096
+epochs: 15
+early_stop_patience: 3
+optimizer: adam
+weight_decay: 1e-5
+use_amp: true
+
+# 数据配置
+ctr_label_field: click_label
+cvr_label_field: label
+label_field: label
+neg_sample_ratio: 10  # 负采样 1:10
+
+# 日期范围（Spark 分区目录）
+train_date_range: ["2024-01-01", "2024-01-21"]
+test_date_range: ["2024-01-22", "2024-01-28"]
+
+# 评估
+metrics: [AUC, GAUC, PCOC, ECE]
+valid_metric: AUC
+eval_step: 1
+
+device: cuda
+seed: 2024
+checkpoint_dir: ./saved/ssl_cvr
+log_dir: ./logs/ssl_cvr
+experiment_name: ssl_cvr_esmm
+use_tensorboard: true

@@ -1,0 +1,18 @@
+# ESMM 默认配置
+model: ESMM
+
+# 模型参数
+embedding_size: 16
+mlp_hidden_size: [256, 128, 64]
+dropout_prob: 0.2
+
+# 多任务参数
+tasks: [ctr, ctcvr]
+task_weights: [1.0, 1.0]
+ctr_label_field: click_label
+cvr_label_field: label
+
+# 训练参数
+learning_rate: 0.001
+train_batch_size: 4096
+epochs: 10

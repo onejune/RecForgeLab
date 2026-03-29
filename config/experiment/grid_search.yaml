@@ -1,0 +1,33 @@
+# 超参搜索实验配置
+# 用法: python run.py --config config/experiment/grid_search.yaml --mode grid_search
+#
+# 支持的搜索空间：学习率、batch size、dropout、embedding 维度等
+
+dataset: criteo
+data_path: ./data/criteo
+model: deepfm
+encoder_type: bucket
+
+# 固定配置
+mlp_hidden_size: [256, 128, 64]
+epochs: 5  # 网格搜索时用少量 epoch 快速筛选
+early_stop_patience: 2
+optimizer: adam
+weight_decay: 1e-5
+
+metrics: [AUC, LogLoss]
+valid_metric: AUC
+device: cuda
+seed: 2024
+
+checkpoint_dir: ./saved/grid_search
+log_dir: ./logs/grid_search
+experiment_name: grid_deepfm
+
+# 网格搜索空间
+# 所有参数的笛卡尔积将被枚举
+grid_search:
+  learning_rate: [0.001, 0.0005, 0.0001]
+  train_batch_size: [2048, 4096, 8192]
+  dropout_prob: [0.1, 0.2, 0.3]
+  embedding_size: [16, 32]

@@ -1,0 +1,26 @@
+# CTR Baseline 实验配置
+
+# 继承模型和数据集配置
+# model: deepfm
+# dataset: criteo
+
+# 实验名称
+experiment_name: ctr_baseline_deepfm_criteo
+
+# 训练配置
+epochs: 10
+learning_rate: 0.001
+train_batch_size: 4096
+early_stop_patience: 3
+
+# 评估配置
+metrics: [AUC, LogLoss, GAUC, PCOC]
+valid_metric: AUC
+eval_step: 1
+
+# 保存配置
+save_model: true
+checkpoint_dir: ./saved
+
+# 日志
+log_dir: ./logs

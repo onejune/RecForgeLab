@@ -1,0 +1,25 @@
+# Ali-CCP 数据集配置（多任务）
+dataset: ali_ccp
+
+# 数据路径（需要修改为实际路径）
+data_path: /path/to/ali_ccp
+
+# 特征配置
+label_field: label
+sparse_features: [userid, adgroup_id, cate_id, campaign_id, customer, brand, pid]
+dense_features: [price]
+
+# 多任务标签
+ctr_label_field: click_label
+cvr_label_field: label
+
+# 数据文件
+train_file: train.parquet
+valid_file: valid.parquet
+test_file: test.parquet
+
+# 连续特征编码
+encoder_type: numeric
+
+# 模型类型
+model_type: multitask

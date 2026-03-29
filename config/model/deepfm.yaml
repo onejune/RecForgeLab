@@ -1,0 +1,12 @@
+# DeepFM 默认配置
+model: DeepFM
+
+# 模型参数
+embedding_size: 16
+mlp_hidden_size: [256, 128, 64]
+dropout_prob: 0.2
+
+# 训练参数
+learning_rate: 0.001
+train_batch_size: 4096
+epochs: 10

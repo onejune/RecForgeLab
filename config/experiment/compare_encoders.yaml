@@ -1,0 +1,96 @@
+# 连续特征编码器对比实验配置
+# 用法: python run.py --config config/experiment/compare_encoders.yaml --mode compare
+#
+# 对比 16 种连续特征编码器在同一模型（DeepFM）上的效果
+# 体现框架对"特征工程"优化方向的支持
+
+dataset: criteo
+data_path: ./data/criteo
+data_format: auto
+
+model: deepfm
+embedding_size: 16
+mlp_hidden_size: [256, 128, 64]
+dropout_prob: 0.2
+
+learning_rate: 0.001
+train_batch_size: 4096
+eval_batch_size: 8192
+epochs: 10
+early_stop_patience: 3
+
+metrics: [AUC, LogLoss]
+valid_metric: AUC
+device: cuda
+seed: 2024
+
+checkpoint_dir: ./saved/compare_encoders
+log_dir: ./logs/compare_encoders
+
+# 编码器对比实验
+experiments:
+  - name: encoder_none
+    config:
+      encoder_type: none
+      experiment_name: encoder_none
+
+  - name: encoder_scalar
+    config:
+      encoder_type: scalar
+      experiment_name: encoder_scalar
+
+  - name: encoder_bucket
+    config:
+      encoder_type: bucket
+      encoder_config:
+        n_buckets: 10
+      experiment_name: encoder_bucket
+
+  - name: encoder_numeric_embedding
+    config:
+      encoder_type: numeric
+      experiment_name: encoder_numeric
+
+  - name: encoder_numeric_deep
+    config:
+      encoder_type: numeric_deep
+      experiment_name: encoder_numeric_deep
+
+  - name: encoder_autodis
+    config:
+      encoder_type: autodis
+      encoder_config:
+        num_intervals: 16
+      experiment_name: encoder_autodis
+
+  - name: encoder_fttransformer
+    config:
+      encoder_type: fttransformer
+      experiment_name: encoder_fttransformer
+
+  - name: encoder_periodic
+    config:
+      encoder_type: periodic
+      encoder_config:
+        n_frequencies: 16
+      experiment_name: encoder_periodic
+
+  - name: encoder_plr
+    config:
+      encoder_type: plr
+      experiment_name: encoder_plr
+
+  - name: encoder_dlrm
+    config:
+      encoder_type: dlrm
+      experiment_name: encoder_dlrm
+
+  - name: encoder_log_transform
+    config:
+      encoder_type: log_transform
+      experiment_name: encoder_log
+
+  - name: encoder_minmax
+    config:
+      encoder_type: minmax
+      experiment_name: encoder_minmax

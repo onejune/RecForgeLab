@@ -1,0 +1,60 @@
+# 多模型对比实验配置
+# 用法: python run.py --config config/experiment/compare_models.yaml --mode compare
+
+# 公共配置（所有实验共享）
+dataset: criteo
+data_path: ./data/criteo
+data_format: auto
+
+embedding_size: 16
+mlp_hidden_size: [256, 128, 64]
+dropout_prob: 0.2
+encoder_type: bucket
+
+learning_rate: 0.001
+train_batch_size: 4096
+eval_batch_size: 8192
+epochs: 10
+early_stop_patience: 3
+optimizer: adam
+weight_decay: 1e-5
+
+metrics: [AUC, LogLoss]
+valid_metric: AUC
+device: cuda
+seed: 2024
+
+checkpoint_dir: ./saved/compare_models
+log_dir: ./logs/compare_models
+
+# 多组实验定义
+experiments:
+  - name: deepfm
+    config:
+      model: deepfm
+      experiment_name: compare_deepfm
+
+  - name: dcn
+    config:
+      model: dcn
+      cross_layer_num: 3
+      experiment_name: compare_dcn
+
+  - name: dcnv2
+    config:
+      model: dcnv2
+      cross_layer_num: 3
+      experiment_name: compare_dcnv2
+
+  - name: autoint
+    config:
+      model: autoint
+      num_heads: 4
+      num_attention_layers: 3
+      experiment_name: compare_autoint
+
+  - name: xdeepfm
+    config:
+      model: xdeepfm
+      cin_layer_sizes: [128, 128, 64]
+      experiment_name: compare_xdeepfm

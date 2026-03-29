@@ -1,0 +1,154 @@
+# IVR Sample v16 数据集配置（多任务 CTR+CVR）
+dataset: ivr_sample_v16
+
+# 数据路径（Spark 输出目录格式）
+data_path: /mnt/data/oss_wanjun/pai_work/open_research/dataset/ivr_sample_v16_ctcvr
+
+# 数据格式：Spark 输出的分区目录
+data_format: spark_dir   # train/ 下是按日期的子目录，每个子目录含多个 part-*.parquet
+
+# 标签字段
+label_field: ctcvr_label
+ctr_label_field: click_label
+cvr_label_field: ctcvr_label
+
+# 模型类型
+model_type: multitask
+
+# 类别特征（99 个）
+sparse_features:
+  - adid
+  - adsize
+  - adx
+  - bundle
+  - business_type
+  - campaignid
+  - campaignsetid
+  - carrier
+  - city
+  - connectiontype
+  - country
+  - country-hour
+  - demand_pkgname
+  - devicetype
+  - duf_inner_dev_pkg_atc_11_30d
+  - duf_inner_dev_pkg_atc_180d
+  - duf_inner_dev_pkg_atc_31_60d
+  - duf_inner_dev_pkg_atc_4_10d
+  - duf_inner_dev_pkg_atc_60d
+  - duf_inner_dev_pkg_atc_61_180d
+  - duf_inner_dev_pkg_atc_90d
+  - duf_inner_dev_pkg_imp_11_30d
+  - duf_inner_dev_pkg_imp_31_60d
+  - duf_inner_dev_pkg_imp_4_10d
+  - duf_inner_dev_pkg_open_11_30d
+  - duf_inner_dev_pkg_open_180d
+  - duf_inner_dev_pkg_open_31_60d
+  - duf_inner_dev_pkg_open_4_10d
+  - duf_inner_dev_pkg_open_60d
+  - duf_inner_dev_pkg_open_61_180d
+  - duf_inner_dev_pkg_open_90d
+  - duf_inner_dev_pkg_pur_11_30d
+  - duf_inner_dev_pkg_pur_180d
+  - duf_inner_dev_pkg_pur_31_60d
+  - duf_inner_dev_pkg_pur_4_10d
+  - duf_inner_dev_pkg_pur_60d
+  - duf_inner_dev_pkg_pur_61_180d
+  - duf_inner_dev_pkg_pur_90d
+  - duf_outer_dev_pkg_atc_11_30d
+  - duf_outer_dev_pkg_atc_15d
+  - duf_outer_dev_pkg_atc_180d
+  - duf_outer_dev_pkg_atc_1d
+  - duf_outer_dev_pkg_atc_30d
+  - duf_outer_dev_pkg_atc_31_60d
+  - duf_outer_dev_pkg_atc_3d
+  - duf_outer_dev_pkg_atc_4_10d
+  - duf_outer_dev_pkg_atc_60d
+  - duf_outer_dev_pkg_atc_61_180d
+  - duf_outer_dev_pkg_atc_7d
+  - duf_outer_dev_pkg_atc_90d
+  - duf_outer_dev_pkg_cv_15d
+  - duf_outer_dev_pkg_cv_1d
+  - duf_outer_dev_pkg_cv_30d
+  - duf_outer_dev_pkg_cv_3d
+  - duf_outer_dev_pkg_cv_60d
+  - duf_outer_dev_pkg_cv_7d
+  - duf_outer_dev_pkg_cv_90d
+  - duf_outer_dev_pkg_open_11_30d
+  - duf_outer_dev_pkg_open_180d
+  - duf_outer_dev_pkg_open_31_60d
+  - duf_outer_dev_pkg_open_4_10d
+  - duf_outer_dev_pkg_open_61_180d
+  - duf_outer_dev_pkg_pur_11_30d
+  - duf_outer_dev_pkg_pur_15d
+  - duf_outer_dev_pkg_pur_180d
+  - duf_outer_dev_pkg_pur_1d
+  - duf_outer_dev_pkg_pur_30d
+  - duf_outer_dev_pkg_pur_31_60d
+  - duf_outer_dev_pkg_pur_3d
+  - duf_outer_dev_pkg_pur_4_10d
+  - duf_outer_dev_pkg_pur_60d
+  - duf_outer_dev_pkg_pur_61_180d
+  - duf_outer_dev_pkg_pur_7d
+  - duf_outer_dev_pkg_pur_90d
+  - duf_outer_dev_pkg_view_11_30d
+  - duf_outer_dev_pkg_view_180d
+  - duf_outer_dev_pkg_view_31_60d
+  - duf_outer_dev_pkg_view_4_10d
+  - duf_outer_dev_pkg_view_61_180d
+  - huf_deviceid_demand_pkgname_gmv_24h
+  - huf_deviceid_demand_pkgname_imp_12h
+  - huf_deviceid_demand_pkgname_imp_1h
+  - huf_deviceid_demand_pkgname_imp_24h
+  - huf_deviceid_demand_pkgname_imp_3h
+  - huf_deviceid_demand_pkgname_pur_24h
+  - huf_deviceid_demand_pkgname_re_12h
+  - huf_deviceid_demand_pkgname_re_1h
+  - huf_deviceid_demand_pkgname_re_24h
+  - huf_deviceid_demand_pkgname_re_3h
+  - imptype
+  - is_interstitial_ad
+  - is_reward_ad
+  - language
+  - make
+  - model
+  - offerid
+  - os
+  - osv
+  - subcategory_id
+
+# 数值特征（26 个，长尾分布，建议用 log 变换或 numeric_embedding）
+dense_features:
+  - duf_inner_dev_pkg_atc_30d
+  - duf_inner_dev_pkg_cv_15d
+  - duf_inner_dev_pkg_cv_30d
+  - duf_inner_dev_pkg_cv_3d
+  - duf_inner_dev_pkg_cv_7d
+  - duf_inner_dev_pkg_imp_15d
+  - duf_inner_dev_pkg_imp_30d
+  - duf_inner_dev_pkg_imp_3d
+  - duf_inner_dev_pkg_imp_7d
+  - duf_inner_dev_pkg_imp_bucket_15d
+  - duf_inner_dev_pkg_imp_bucket_3d
+  - duf_inner_dev_pkg_imp_bucket_7d
+  - duf_inner_dev_pkg_pur_15d
+  - duf_inner_dev_pkg_pur_30d
+  - duf_inner_dev_pkg_pur_3d
+  - duf_inner_dev_pkg_pur_7d
+  - duf_inner_dev_pkg_pur_bucket_15d
+  - duf_inner_dev_pkg_pur_bucket_3d
+  - duf_inner_dev_pkg_pur_bucket_7d
+  - duf_inner_dev_pkg_re_15d
+  - duf_inner_dev_pkg_re_30d
+  - duf_inner_dev_pkg_re_3d
+  - duf_inner_dev_pkg_re_7d
+  - duf_inner_dev_pkg_re_bucket_15d
+  - duf_inner_dev_pkg_re_bucket_3d
+  - duf_inner_dev_pkg_re_bucket_7d
+
+# 连续特征编码（推荐 log 变换，因为都是计数类特征）
+encoder_type: log
+
+# 训练/测试日期切分（30 天 train，3 天 test）
+train_date_range: ["2026-02-16", "2026-03-16"]
+test_date_range: ["2026-03-17", "2026-03-19"]

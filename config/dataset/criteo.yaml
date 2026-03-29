@@ -1,0 +1,18 @@
+# Criteo 数据集配置
+dataset: criteo
+
+# 数据路径（需要修改为实际路径）
+data_path: /path/to/criteo
+
+# 特征配置
+label_field: label
+sparse_features: [C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, C14, C15, C16, C17, C18, C19, C20, C21, C22, C23, C24, C25, C26]
+dense_features: [I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12, I13]
+
+# 数据文件
+train_file: train.parquet
+valid_file: valid.parquet
+test_file: test.parquet
+
+# 连续特征编码
+encoder_type: bucket
