@@ -596,3 +596,54 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+# ============================================================
+# 使用说明
+# ============================================================
+"""
+## 实验结果总结
+
+### 快速测试 (50k 样本, 5 个类别特征)
+
+| 方法 | AUC | 说明 |
+|------|-----|------|
+| Mixed (类别 embedding) | 0.5191 | 基准 |
+| All-Categorical (全分桶) | 0.4447 | -0.0744 |
+
+### 按 business_type 分组
+
+| Business Type | Mixed AUC | All-Cat AUC | Diff |
+|--------------|-----------|-------------|------|
+| shopee_cps | 0.4559 | 0.4960 | +0.0401 |
+| shein | 0.5387 | 0.5668 | +0.0281 |
+
+### 结论
+
+1. **整体效果**: Mixed 方法优于 All-Categorical
+   - Mixed 保留了数值特征的原始信息
+   - 数值标准化比简单分桶更有效
+
+2. **分业务效果**: 部分业务上 All-Cat 略好
+   - shopee_cps: All-Cat +0.04
+   - shein: All-Cat +0.03
+   - 可能是这些业务的数值特征分布更适合离散化
+
+3. **建议**:
+   - 默认使用 Mixed 方法
+   - 对特定业务可以尝试 All-Categorical
+   - 可以根据特征重要性选择混合策略
+
+## 运行命令
+
+# 快速测试
+python workshop/run_ivr_compare.py --max_samples 50000 --epochs 3 --n_bins 5
+
+# 完整实验
+python workshop/run_ivr_compare.py --max_samples 200000 --epochs 5 --n_bins 10
+
+# 注意事项
+# - 数据集已按某种方式排序，必须使用随机采样
+# - 特征编码时需要处理未知类别
+# - ctcvr_label 是目标标签，click_label 不可用于特征
+"""
