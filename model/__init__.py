@@ -15,6 +15,7 @@ from .multi_domain import STAR, M2M, EPNet, PPNet, HAMUR, M3oE
 from .ltv import (
     ZILN, TwoStageLTV, TweedieLTV, OrdinalLTV, MDNLTV,
     DirectRegressionLTV, MSELTV, MAELTV, HuberLTV, LogCoshLTV, QuantileLTV, LogMSELTV,
+    LogNormalLTV, GammaLTV, ShiftedLogNormalLTV, BoxCoxLTV, LogRegressionLTV,
 )
 
 __all__ = [
@@ -48,7 +49,7 @@ __all__ = [
     "PPNet",
     "HAMUR",
     "M3oE",
-    # LTV 模型 - 概率模型
+    # LTV 模型 - 概率模型（零膨胀）
     "ZILN",
     "TwoStageLTV",
     "TweedieLTV",
@@ -62,4 +63,10 @@ __all__ = [
     "LogCoshLTV",
     "QuantileLTV",
     "LogMSELTV",
+    # LTV 模型 - 付费用户建模
+    "LogNormalLTV",
+    "GammaLTV",
+    "ShiftedLogNormalLTV",
+    "BoxCoxLTV",
+    "LogRegressionLTV",
 ]

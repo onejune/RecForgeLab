@@ -120,6 +120,49 @@ def collate_fn(batch):
     }
 
 
+class PaidOnlyLTVDataset(Dataset):
+    """付费用户数据集（只包含 LTV > 0 的样本）
+    
+    用于测试付费用户建模方法
+    """
+    
+    def __init__(self, n_samples=10000, n_features=20, seed=42):
+        np.random.seed(seed)
+        
+        self.n_samples = n_samples
+        
+        # 生成特征
+        self.features = np.random.randn(n_samples, n_features).astype(np.float32)
+        
+        # 生成 LTV（只生成正值，LogNormal 分布）
+        mu = 5.0 + 0.5 * self.features[:, 2]
+        sigma = 1.0
+        self.labels = np.exp(np.random.normal(mu, sigma)).astype(np.float32)
+        
+        # 截断
+        self.labels = np.clip(self.labels, 1, 10000)
+        
+        self.ltv_mean = self.labels.mean()
+        self.ltv_std = self.labels.std()
+        
+    def __len__(self):
+        return self.n_samples
+    
+    def __getitem__(self, idx):
+        return {
+            'features': self.features[idx],
+            'ltv': self.labels[idx],
+        }
+    
+    def get_stats(self):
+        return {
+            'n_samples': self.n_samples,
+            'ltv_mean': self.ltv_mean,
+            'ltv_std': self.ltv_std,
+            'ltv_median': np.median(self.labels),
+        }
+
+
 # ============================================================
 # 简化版 LTV 模型（适配合成数据）
 # ============================================================
@@ -546,6 +589,104 @@ class SimpleQuantile(SimpleLTVBase):
 
 
 # ============================================================
+# 付费用户建模（LTV > 0）
+# ============================================================
+
+class SimpleLogNormal(SimpleLTVBase):
+    """Log-Normal 回归（假设 log(LTV) ~ N(μ, σ²)）"""
+    
+    def __init__(self, n_features=20, hidden_sizes=[128, 64]):
+        super().__init__(n_features, hidden_sizes)
+        h = hidden_sizes[-1]
+        self.mu_head = torch.nn.Linear(h, 1)
+        self.log_sigma_head = torch.nn.Linear(h, 1)
+    
+    def forward(self, batch):
+        h = self.mlp(batch['features'])
+        mu = self.mu_head(h).squeeze(-1)
+        log_sigma = self.log_sigma_head(h).squeeze(-1)
+        return mu, log_sigma
+    
+    def calculate_loss(self, batch):
+        mu, log_sigma = self.forward(batch)
+        labels = batch['ltv']
+        
+        eps = 1e-6
+        y = torch.clamp(labels, min=eps)
+        log_y = torch.log(y)
+        
+        sigma = torch.exp(torch.clamp(log_sigma, min=-5, max=5))
+        
+        nll = log_sigma + 0.5 * np.log(2 * np.pi) + 0.5 * ((log_y - mu) / sigma) ** 2
+        
+        return nll.mean()
+    
+    def predict(self, batch):
+        mu, log_sigma = self.forward(batch)
+        sigma = torch.exp(torch.clamp(log_sigma, min=-5, max=5))
+        return torch.exp(mu + 0.5 * sigma ** 2)
+
+
+class SimpleGamma(SimpleLTVBase):
+    """Gamma 回归（假设 LTV ~ Gamma(α, β)）"""
+    
+    def __init__(self, n_features=20, hidden_sizes=[128, 64]):
+        super().__init__(n_features, hidden_sizes)
+        h = hidden_sizes[-1]
+        self.log_alpha_head = torch.nn.Linear(h, 1)
+        self.log_beta_head = torch.nn.Linear(h, 1)
+    
+    def forward(self, batch):
+        h = self.mlp(batch['features'])
+        log_alpha = torch.clamp(self.log_alpha_head(h).squeeze(-1), min=-5, max=10)
+        log_beta = torch.clamp(self.log_beta_head(h).squeeze(-1), min=-5, max=10)
+        return log_alpha, log_beta
+    
+    def calculate_loss(self, batch):
+        log_alpha, log_beta = self.forward(batch)
+        labels = batch['ltv']
+        
+        alpha = torch.exp(log_alpha)
+        beta = torch.exp(log_beta)
+        
+        eps = 1e-6
+        y = torch.clamp(labels, min=eps)
+        
+        nll = -log_alpha * log_beta + torch.lgamma(alpha) - (alpha - 1) * torch.log(y) + beta * y
+        
+        return nll.mean()
+    
+    def predict(self, batch):
+        log_alpha, log_beta = self.forward(batch)
+        alpha = torch.exp(log_alpha)
+        beta = torch.exp(log_beta)
+        return alpha / beta
+
+
+class SimpleLogRegression(SimpleLTVBase):
+    """简单 Log 回归（预测 log(LTV)，MSE Loss）"""
+    
+    def __init__(self, n_features=20, hidden_sizes=[128, 64]):
+        super().__init__(n_features, hidden_sizes)
+        h = hidden_sizes[-1]
+        self.output_layer = torch.nn.Linear(h, 1)
+    
+    def forward(self, batch):
+        h = self.mlp(batch['features'])
+        return self.output_layer(h).squeeze(-1)
+    
+    def calculate_loss(self, batch):
+        pred = self.forward(batch)
+        labels = batch['ltv']
+        log_target = torch.log(torch.clamp(labels, min=1.0))
+        return torch.nn.functional.mse_loss(pred, log_target)
+    
+    def predict(self, batch):
+        pred = self.forward(batch)
+        return torch.exp(pred)
+
+
+# ============================================================
 # 评估函数
 # ============================================================
 
@@ -653,42 +794,74 @@ def main():
     parser.add_argument('--batch_size', type=int, default=1024)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--model', type=str, default=None, help='Run specific model')
+    parser.add_argument('--paid_only', action='store_true', help='Only use paid samples (LTV > 0)')
     args = parser.parse_args()
     
     print("=" * 80)
     print("LTV 预估模型对比实验")
+    if args.paid_only:
+        print("【付费用户模式】只使用 LTV > 0 的样本")
     print("=" * 80)
     
     # 生成数据
     print("\n[生成数据]")
-    train_data = SyntheticLTVDataset(n_samples=args.n_samples, seed=42)
-    test_data = SyntheticLTVDataset(n_samples=args.n_samples // 5, seed=123)
     
-    stats = train_data.get_stats()
-    print(f"  训练样本: {stats['n_samples']:,}")
-    print(f"  零值比例: {stats['zero_ratio']:.2%}")
-    print(f"  付费用户均值: {stats['paid_mean']:.2f}")
-    print(f"  整体均值: {stats['ltv_mean']:.2f}")
+    if args.paid_only:
+        # 付费用户数据集
+        train_data = PaidOnlyLTVDataset(n_samples=args.n_samples, seed=42)
+        test_data = PaidOnlyLTVDataset(n_samples=args.n_samples // 5, seed=123)
+        
+        stats = train_data.get_stats()
+        print(f"  训练样本: {stats['n_samples']:,}")
+        print(f"  LTV 均值: {stats['ltv_mean']:.2f}")
+        print(f"  LTV 中位数: {stats['ltv_median']:.2f}")
+        print(f"  LTV 标准差: {stats['ltv_std']:.2f}")
+    else:
+        # 完整数据集（含零值）
+        train_data = SyntheticLTVDataset(n_samples=args.n_samples, seed=42)
+        test_data = SyntheticLTVDataset(n_samples=args.n_samples // 5, seed=123)
+        
+        stats = train_data.get_stats()
+        print(f"  训练样本: {stats['n_samples']:,}")
+        print(f"  零值比例: {stats['zero_ratio']:.2%}")
+        print(f"  付费用户均值: {stats['paid_mean']:.2f}")
+        print(f"  整体均值: {stats['ltv_mean']:.2f}")
     
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
     test_loader = DataLoader(test_data, batch_size=args.batch_size * 2, shuffle=False, collate_fn=collate_fn)
     
     # 模型列表
-    models = {
-        # 概率模型
-        'ziln': SimpleZILN,
-        'two_stage': SimpleTwoStage,
-        'tweedie': SimpleTweedie,
-        'ordinal': SimpleOrdinal,
-        'mdn': SimpleMDN,
-        # 直接回归
-        'mse': SimpleMSE,
-        'mae': SimpleMAE,
-        'huber': SimpleHuber,
-        'log_mse': SimpleLogMSE,
-        'weighted_mse': SimpleWeightedMSE,
-        'quantile': SimpleQuantile,
-    }
+    if args.paid_only:
+        # 付费用户建模专用
+        models = {
+            'lognormal': SimpleLogNormal,
+            'log_regression': SimpleLogRegression,
+            'mse': SimpleMSE,
+            'mae': SimpleMAE,
+            'huber': SimpleHuber,
+            'log_mse': SimpleLogMSE,
+            'quantile': SimpleQuantile,
+        }
+    else:
+        # 完整模型列表
+        models = {
+            # 概率模型
+            'ziln': SimpleZILN,
+            'two_stage': SimpleTwoStage,
+            'tweedie': SimpleTweedie,
+            'ordinal': SimpleOrdinal,
+            'mdn': SimpleMDN,
+            # 直接回归
+            'mse': SimpleMSE,
+            'mae': SimpleMAE,
+            'huber': SimpleHuber,
+            'log_mse': SimpleLogMSE,
+            'weighted_mse': SimpleWeightedMSE,
+            'quantile': SimpleQuantile,
+            # 付费用户建模
+            'lognormal': SimpleLogNormal,
+            'log_regression': SimpleLogRegression,
+        }
     
     if args.model:
         models = {args.model: models[args.model]}
