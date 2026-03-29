@@ -1,12 +1,12 @@
-# experiments/ 目录说明
+# workshop/ 目录说明
 
 这个目录存放**针对具体数据集/场景的定制实验脚本**，是对 `run.py` 通用能力的补充。
 
 ---
 
-## run.py vs experiments/ 的区别
+## run.py vs workshop/ 的区别
 
-| | `run.py` | `experiments/` |
+| | `run.py` | `workshop/` |
 |---|---|---|
 | **定位** | 通用入口，适配任意模型/数据集 | 针对特定场景的定制脚本 |
 | **配置方式** | YAML 配置文件 + 命令行参数 | 配置硬编码在脚本里，开箱即用 |
@@ -15,7 +15,7 @@
 
 **简单理解**：
 - `run.py` = 通用工具，适合大多数情况
-- `experiments/` = 针对具体任务的一次性脚本，适合需要定制逻辑时
+- `workshop/` = 针对具体任务的一次性脚本，适合需要定制逻辑时
 
 ---
 
@@ -28,13 +28,13 @@
 cd /mnt/workspace/open_research
 
 # 运行单个模型
-python recforgelab/experiments/run_ivr_multitask.py --model esmm
+python recforgelab/workshop/run_ivr_multitask.py --model esmm
 
 # 对比所有多任务模型
-python recforgelab/experiments/run_ivr_multitask.py --compare_models
+python recforgelab/workshop/run_ivr_multitask.py --compare_models
 
 # 对比不同连续特征编码器（固定 esmm 模型）
-python recforgelab/experiments/run_ivr_multitask.py --compare_encoders --model esmm
+python recforgelab/workshop/run_ivr_multitask.py --compare_encoders --model esmm
 ```
 
 **适合场景**：快速在 IVR 数据集上跑实验，不想每次写配置文件。
@@ -73,7 +73,7 @@ python recforgelab/run.py --config recforgelab/config/experiment/ssl_cvr.yaml --
 
 ## 什么时候应该在这里写新脚本？
 
-以下情况适合在 `experiments/` 新建脚本，而不是用 `run.py`：
+以下情况适合在 `workshop/` 新建脚本，而不是用 `run.py`：
 
 1. **特殊数据预处理**：需要在加载数据后做额外处理（如合并多个数据集、自定义负采样策略）
 2. **多阶段训练**：SSL 预训练 → 微调，且需要在两阶段之间做额外操作
@@ -87,6 +87,6 @@ python recforgelab/run.py --config recforgelab/config/experiment/ssl_cvr.yaml --
 
 ```
 日常实验  →  run.py + config/experiment/*.yaml
-IVR 专项  →  experiments/run_ivr_multitask.py
+IVR 专项  →  workshop/run_ivr_multitask.py
 自定义逻辑 →  在这里新建脚本
 ```

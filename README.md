@@ -139,7 +139,7 @@ recforgelab/
 │   ├── enum.py                 # 枚举类型
 │   └── experiment.py           # ExperimentRecorder / ModelComparator
 │
-└── experiments/                # 实验脚本（可直接运行）
+└── workshop/                # 实验脚本（可直接运行）
     ├── run_ivr_multitask.py    # IVR v16 多任务对比
     ├── run_encoder_comparison.py
     ├── run_multitask_comparison.py
