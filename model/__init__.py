@@ -4,7 +4,7 @@ RecForgeLab 模型模块
 """
 
 from .base import (
-    BaseModel, CTRModel, MultiTaskModel, MultiDomainModel, SSLModel,
+    BaseModel, CTRModel, MultiTaskModel, MultiDomainModel, SSLModel, LTVModel,
     MODEL_REGISTRY, register_model, get_model,
 )
 
@@ -12,6 +12,7 @@ from .base import (
 from .ctr import DeepFM, DCN, DCNv2, AutoInt, xDeepFM
 from .multitask import ESMM, MMoE, PLE, SharedBottom, DirectCTCVR
 from .multi_domain import STAR, M2M, EPNet, PPNet, HAMUR, M3oE
+from .ltv import ZILN, TwoStageLTV, TweedieLTV, OrdinalLTV, MDNLTV
 
 __all__ = [
     # 基类
@@ -20,6 +21,7 @@ __all__ = [
     "MultiTaskModel",
     "MultiDomainModel",
     "SSLModel",
+    "LTVModel",
     # 注册机制
     "MODEL_REGISTRY",
     "register_model",
@@ -43,4 +45,10 @@ __all__ = [
     "PPNet",
     "HAMUR",
     "M3oE",
+    # LTV 模型
+    "ZILN",
+    "TwoStageLTV",
+    "TweedieLTV",
+    "OrdinalLTV",
+    "MDNLTV",
 ]

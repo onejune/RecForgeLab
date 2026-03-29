@@ -311,3 +311,38 @@ class MultiDomainModel(BaseModel):
     ) -> Dict[str, float]:
         """默认返回域数量"""
         return {"num_domains": float(self.num_domains)}
+
+
+# ============================================================
+# LTV 基类
+# ============================================================
+
+class LTVModel(BaseModel):
+    """LTV 预估模型基类
+    
+    model_type = ModelType.LTV
+    核心特点：
+    - 预测用户生命周期价值
+    - 处理零膨胀分布（大部分用户 LTV=0）
+    - 支持 MAE/MSE/Gini/Decile 等指标
+    """
+    
+    model_type = ModelType.LTV
+    label_field = "ltv"
+    
+    def __init__(self, config, dataset):
+        super().__init__(config, dataset)
+        
+        # LTV 特有配置
+        self.ltv_max = config.get("ltv_max", 10000.0)
+        self.log_transform = config.get("log_transform", True)
+        self.zero_threshold = config.get("zero_threshold", 0.5)
+    
+    def predict_distribution(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        """预测分布参数（概率模型覆盖此方法）"""
+        return {"value": self.predict(batch)}
+    
+    @abstractmethod
+    def predict(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
+        """预测 LTV 值"""
+        raise NotImplementedError

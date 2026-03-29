@@ -15,6 +15,7 @@ class ModelType(Enum):
     MULTIDOMAIN = "multi_domain"  # 多域/多场景
     SEQUENTIAL = "sequential" # 序列模型
     SSL = "ssl"               # 自监督学习
+    LTV = "ltv"               # LTV 预估
 
 
 class InputType(Enum):
