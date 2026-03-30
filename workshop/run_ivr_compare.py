@@ -73,15 +73,11 @@ class IVRDatasetMixed(Dataset):
             self.encoders = encoders
             self.sparse_data = {}
             for col in self.string_cols:
-                df[col] = df[col].fillna('__UNKNOWN__')
-                unknown_idx = 0
-                result = []
-                for val in df[col].astype(str):
-                    if val in self.encoders[col].classes_:
-                        result.append(self.encoders[col].transform([val])[0])
-                    else:
-                        result.append(unknown_idx)
-                self.sparse_data[col] = np.array(result, dtype=np.int64)
+                df[col] = df[col].fillna('__UNKNOWN__').astype(str)
+                le = self.encoders[col]
+                # 快速映射：用 pandas map 代替 np.isin
+                mapping = {v: i for i, v in enumerate(le.classes_)}
+                self.sparse_data[col] = df[col].map(mapping).fillna(0).astype(np.int64).values
         
         # 数值特征标准化
         self.dense_data = df[self.numeric_cols].values.astype(np.float32)
@@ -133,10 +129,10 @@ class IVRDatasetMixed(Dataset):
 # ============================================================
 
 class IVRDatasetAllCategorical(Dataset):
-    """所有特征都当做类别特征（数值特征分桶）"""
+    """所有特征都当做类别特征（数值特征已离散化，直接编码）"""
     
     def __init__(self, data_path, phase='train', max_samples=None, encoders=None,
-                 all_cols=None, n_bins=10):
+                 all_cols=None):
         print(f"Loading {phase} data (All-Categorical) from {data_path}...")
         
         df = pd.read_parquet(data_path)
@@ -155,31 +151,22 @@ class IVRDatasetAllCategorical(Dataset):
         else:
             self.all_cols = all_cols
         
-        # 编码所有特征
+        # 编码所有特征（数值特征已离散化，直接当类别处理）
         if encoders is None:
             self.encoders = {}
             self.sparse_data = {}
             
             for col in self.all_cols:
                 le = LabelEncoder()
-                
+                # 统一处理：填充缺失 + 转字符串
                 if df[col].dtype == 'object':
-                    # 字符串特征
                     df[col] = df[col].fillna('__UNKNOWN__')
-                    unique_vals = df[col].astype(str).unique().tolist()
-                    if '__UNKNOWN__' not in unique_vals:
-                        unique_vals.append('__UNKNOWN__')
                 else:
-                    # 数值特征 -> 分桶
-                    try:
-                        # 使用 qcut 分桶
-                        df[col] = pd.qcut(df[col], q=n_bins, labels=False, duplicates='drop')
-                        df[col] = df[col].fillna(-1).astype(int) + 1  # -1 -> 0 (unknown)
-                        unique_vals = list(range(n_bins + 1))
-                    except:
-                        # 如果分桶失败，直接当做类别
-                        df[col] = df[col].fillna(-1).astype(int) + 1
-                        unique_vals = df[col].unique().tolist()
+                    df[col] = df[col].fillna(-1)
+                
+                unique_vals = df[col].astype(str).unique().tolist()
+                if '__UNKNOWN__' not in unique_vals and df[col].dtype == 'object':
+                    unique_vals.append('__UNKNOWN__')
                 
                 le.fit(unique_vals)
                 self.sparse_data[col] = le.transform(df[col].astype(str)).astype(np.int64)
@@ -192,20 +179,12 @@ class IVRDatasetAllCategorical(Dataset):
                 if df[col].dtype == 'object':
                     df[col] = df[col].fillna('__UNKNOWN__')
                 else:
-                    try:
-                        df[col] = pd.qcut(df[col], q=n_bins, labels=False, duplicates='drop')
-                        df[col] = df[col].fillna(-1).astype(int) + 1
-                    except:
-                        df[col] = df[col].fillna(-1).astype(int) + 1
+                    df[col] = df[col].fillna(-1)
                 
-                unknown_idx = 0
-                result = []
-                for val in df[col].astype(str):
-                    if val in self.encoders[col].classes_:
-                        result.append(self.encoders[col].transform([val])[0])
-                    else:
-                        result.append(unknown_idx)
-                self.sparse_data[col] = np.array(result, dtype=np.int64)
+                le = self.encoders[col]
+                # 快速映射：用 pandas map
+                mapping = {v: i for i, v in enumerate(le.classes_)}
+                self.sparse_data[col] = df[col].astype(str).map(mapping).fillna(0).astype(np.int64).values
         
         self.n_samples = len(df)
         self.n_features = len(self.all_cols)
@@ -474,9 +453,10 @@ def main():
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--device', type=str, default='cpu')
     parser.add_argument('--max_samples', type=int, default=None)
+    parser.add_argument('--test_samples', type=int, default=200000, help='Test set samples (default 200k for faster eval)')
     parser.add_argument('--n_bins', type=int, default=10, help='Number of bins for numerical features')
     args = parser.parse_args()
-    
+
     print("=" * 80)
     print("IVR v16 DeepFM 对比实验")
     print("=" * 80)
@@ -484,7 +464,6 @@ def main():
     print(f"Batch size: {args.batch_size}")
     print(f"Learning rate: {args.lr}")
     print(f"Device: {args.device}")
-    print(f"Num bins (for numerical): {args.n_bins}")
     if args.max_samples:
         print(f"Max samples: {args.max_samples:,} (快速测试模式)")
     
@@ -505,10 +484,11 @@ def main():
     )
     
     encoders_a = train_data_a.get_encoders()
+    test_samples_a = args.test_samples if args.test_samples else (args.max_samples // 5 if args.max_samples else 200000)
     valid_data_a = IVRDatasetMixed(
         data_root / 'test',
         phase='valid',
-        max_samples=args.max_samples // 5 if args.max_samples else None,
+        max_samples=test_samples_a,
         encoders=encoders_a['encoders'],
         string_cols=encoders_a['string_cols'],
         numeric_cols=encoders_a['numeric_cols'],
@@ -546,17 +526,16 @@ def main():
         data_root / 'train',
         phase='train',
         max_samples=args.max_samples,
-        n_bins=args.n_bins,
     )
     
     encoders_b = train_data_b.get_encoders()
+    test_samples_b = args.test_samples if args.test_samples else (args.max_samples // 5 if args.max_samples else 200000)
     valid_data_b = IVRDatasetAllCategorical(
         data_root / 'test',
         phase='valid',
-        max_samples=args.max_samples // 5 if args.max_samples else None,
+        max_samples=test_samples_b,
         encoders=encoders_b['encoders'],
         all_cols=encoders_b['all_cols'],
-        n_bins=args.n_bins,
     )
     
     train_loader_b = DataLoader(train_data_b, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn_all_cat)
